@@ -4,6 +4,16 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+
+// Extend Window interface for AI Studio integration
+declare global {
+  interface Window {
+    aistudio?: {
+      hasSelectedApiKey: () => Promise<boolean>;
+      openSelectKey: () => Promise<void>;
+    };
+  }
+}
 import { GoogleGenAI } from "@google/genai";
 import {
   Upload,
@@ -86,9 +96,10 @@ export default function App() {
   const [result, setResult] = useState<VideoGenerationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16'>('16:9');
-  const [resolution, setResolution] = useState<'720p' | '1080p' | '1440p' | '2160p' | '4320p'>('720p');
-  const [duration, setDuration] = useState<number>(5);
-  const [fps, setFps] = useState<number>(24);
+  const [resolution, setResolution] = useState<'720p' | '1080p' | '4k'>('720p');
+  const [duration, setDuration] = useState<number>(8);
+  const [generateAudio, setGenerateAudio] = useState<boolean>(true);
+  const [negativePrompt, setNegativePrompt] = useState<string>('');
   const [motionIntensity, setMotionIntensity] = useState<number>(5);
   const [lastFrame, setLastFrame] = useState<string | null>(null);
   const [cameraMovements, setCameraMovements] = useState<string[]>([]);
@@ -107,7 +118,6 @@ export default function App() {
 
   const checkApiKey = async () => {
     // Check if we have a server-side key or AI Studio key
-    // @ts-ignore
     if (window.aistudio) {
       const selected = await window.aistudio.hasSelectedApiKey();
       setHasKey(selected);
@@ -118,7 +128,6 @@ export default function App() {
   };
 
   const handleOpenKeySelector = async () => {
-    // @ts-ignore
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
       setHasKey(true);
@@ -194,10 +203,8 @@ export default function App() {
         prompt: finalPrompt,
         config: {
           numberOfVideos: 1,
-          resolution: resolution as any,
           aspectRatio: aspectRatio,
-          durationSeconds: duration,
-          fps: fps
+          durationSeconds: duration
         }
       };
 
@@ -227,7 +234,7 @@ export default function App() {
       });
 
       let genResponseText = await genResponse.text();
-      
+
       if (!genResponse.ok) {
         throw new Error(`Server error: ${genResponse.status} - ${genResponseText}`);
       }
@@ -251,7 +258,7 @@ export default function App() {
         });
 
         let pollResponseText = await pollResponse.text();
-        
+
         if (!pollResponse.ok) {
           throw new Error(`Failed to get operation status: ${pollResponse.status} - ${pollResponseText}`);
         }
@@ -561,8 +568,8 @@ export default function App() {
                           key={move.id}
                           onClick={() => toggleCameraMovement(move.id)}
                           className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group relative ${cameraMovements.includes(move.id)
-                              ? 'bg-[#ff4e00] border-[#ff4e00] text-white'
-                              : 'bg-white/5 border-white/10 text-[#f5f2ed]/40 hover:border-white/30'
+                            ? 'bg-[#ff4e00] border-[#ff4e00] text-white'
+                            : 'bg-white/5 border-white/10 text-[#f5f2ed]/40 hover:border-white/30'
                             }`}
                         >
                           {move.icon}
@@ -621,8 +628,8 @@ export default function App() {
                         key={ratio}
                         onClick={() => setAspectRatio(ratio)}
                         className={`flex-1 py-3 rounded-xl text-xs font-medium border transition-all ${aspectRatio === ratio
-                            ? 'bg-[#ff4e00] border-[#ff4e00] text-white'
-                            : 'bg-white/5 border-[#f5f2ed]/10 text-[#f5f2ed]/60 hover:border-[#f5f2ed]/30'
+                          ? 'bg-[#ff4e00] border-[#ff4e00] text-white'
+                          : 'bg-white/5 border-[#f5f2ed]/10 text-[#f5f2ed]/60 hover:border-[#f5f2ed]/30'
                           }`}
                       >
                         {ratio === '16:9' ? 'Landscape (16:9)' : 'Portrait (9:16)'}
@@ -637,20 +644,18 @@ export default function App() {
                     <Sparkles className="w-3 h-3" />
                     Video Quality
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     {[
                       { id: '720p', label: '720p (HD)' },
                       { id: '1080p', label: '1080p (Full HD)' },
-                      { id: '1440p', label: '1440p (2K)' },
-                      { id: '2160p', label: '2160p (4K)' },
-                      { id: '4320p', label: '8K (4320p)' }
+                      { id: '4k', label: '4K (Ultra HD)' }
                     ].map((quality) => (
                       <button
                         key={quality.id}
                         onClick={() => setResolution(quality.id as any)}
                         className={`py-3 rounded-xl text-[10px] font-bold uppercase tracking-wider border transition-all ${resolution === quality.id
-                            ? 'bg-[#ff4e00] border-[#ff4e00] text-white'
-                            : 'bg-white/5 border-[#f5f2ed]/10 text-[#f5f2ed]/60 hover:border-[#f5f2ed]/30'
+                          ? 'bg-[#ff4e00] border-[#ff4e00] text-white'
+                          : 'bg-white/5 border-[#f5f2ed]/10 text-[#f5f2ed]/60 hover:border-[#f5f2ed]/30'
                           }`}
                       >
                         {quality.label}
@@ -658,51 +663,66 @@ export default function App() {
                     ))}
                   </div>
                   <p className="text-[10px] text-[#f5f2ed]/30 italic">
-                    * Note: 1440p, 2160p, and 4320p may require higher tier API access.
+                    * Note: 1080p and 4K may require higher tier API access.
                   </p>
                 </div>
 
-                {/* Duration & Frame Rate */}
+                {/* Duration & Audio */}
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <label className="text-xs font-bold uppercase tracking-widest text-[#f5f2ed]/40 flex items-center gap-2">
                       <Clock className="w-3 h-3" />
                       Duration
                     </label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min="1"
-                        max="10"
-                        step="1"
-                        value={duration}
-                        onChange={(e) => setDuration(parseInt(e.target.value))}
-                        className="flex-1 accent-[#ff4e00]"
-                      />
-                      <span className="text-xs font-mono text-[#ff4e00] w-8">{duration}s</span>
+                    <div className="flex gap-2">
+                      {[4, 6, 8].map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => setDuration(d)}
+                          className={`flex-1 py-2 rounded-lg text-[10px] font-bold border transition-all ${duration === d
+                            ? 'bg-[#ff4e00] border-[#ff4e00] text-white'
+                            : 'bg-white/5 border-[#f5f2ed]/10 text-[#f5f2ed]/40 hover:border-[#f5f2ed]/30'
+                            }`}
+                        >
+                          {d}s
+                        </button>
+                      ))}
                     </div>
                   </div>
 
                   <div className="space-y-3">
                     <label className="text-xs font-bold uppercase tracking-widest text-[#f5f2ed]/40 flex items-center gap-2">
                       <Gauge className="w-3 h-3" />
-                      Frame Rate
+                      Audio Generation
                     </label>
-                    <div className="flex gap-2">
-                      {[24, 30, 60].map((f) => (
-                        <button
-                          key={f}
-                          onClick={() => setFps(f)}
-                          className={`flex-1 py-2 rounded-lg text-[10px] font-bold border transition-all ${fps === f
-                              ? 'bg-[#ff4e00] border-[#ff4e00] text-white'
-                              : 'bg-white/5 border-[#f5f2ed]/10 text-[#f5f2ed]/40 hover:border-[#f5f2ed]/30'
-                            }`}
-                        >
-                          {f}
-                        </button>
-                      ))}
-                    </div>
+                    <button
+                      onClick={() => setGenerateAudio(!generateAudio)}
+                      className={`w-full py-2 rounded-lg text-[10px] font-bold border transition-all flex items-center justify-center gap-2 ${generateAudio
+                        ? 'bg-[#ff4e00] border-[#ff4e00] text-white'
+                        : 'bg-white/5 border-[#f5f2ed]/10 text-[#f5f2ed]/40 hover:border-[#f5f2ed]/30'
+                        }`}
+                    >
+                      {generateAudio ? <Check className="w-3 h-3" /> : null}
+                      {generateAudio ? 'Audio Enabled' : 'No Audio'}
+                    </button>
+                    <p className="text-[10px] text-[#f5f2ed]/30 italic">
+                      Veo 3+ generates native audio synced to video
+                    </p>
                   </div>
+                </div>
+
+                {/* Negative Prompt */}
+                <div className="space-y-3">
+                  <label className="text-xs font-bold uppercase tracking-widest text-[#f5f2ed]/40 flex items-center gap-2">
+                    <ShieldAlert className="w-3 h-3" />
+                    Negative Prompt (Optional)
+                  </label>
+                  <input
+                    value={negativePrompt}
+                    onChange={(e) => setNegativePrompt(e.target.value)}
+                    placeholder="Things to avoid (e.g., 'blurry, low quality, text, watermark')"
+                    className="w-full bg-black/20 border border-[#f5f2ed]/10 rounded-2xl p-4 text-sm focus:outline-none focus:border-[#ff4e00]/50 transition-colors"
+                  />
                 </div>
 
                 {/* Generate Button */}
@@ -710,8 +730,8 @@ export default function App() {
                   onClick={generateVideo}
                   disabled={(!image && !contentDescription) || isGenerating}
                   className={`w-full py-5 rounded-full font-bold text-sm uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all ${(!image && !contentDescription) || isGenerating
-                      ? 'bg-[#f5f2ed]/5 text-[#f5f2ed]/20 cursor-not-allowed'
-                      : 'bg-[#ff4e00] text-white hover:bg-[#ff4e00]/90 shadow-[0_0_40px_rgba(255,78,0,0.2)]'
+                    ? 'bg-[#f5f2ed]/5 text-[#f5f2ed]/20 cursor-not-allowed'
+                    : 'bg-[#ff4e00] text-white hover:bg-[#ff4e00]/90 shadow-[0_0_40px_rgba(255,78,0,0.2)]'
                     }`}
                 >
                   {isGenerating ? (
@@ -781,8 +801,8 @@ export default function App() {
                     key={index}
                     onClick={() => handleExampleClick(example, index)}
                     className={`text-left p-4 bg-white/5 border rounded-2xl transition-all group relative overflow-hidden ${appliedIndex === index
-                        ? 'border-[#ff4e00] bg-[#ff4e00]/10'
-                        : 'border-[#f5f2ed]/10 hover:border-[#ff4e00]/50 hover:bg-[#ff4e00]/5'
+                      ? 'border-[#ff4e00] bg-[#ff4e00]/10'
+                      : 'border-[#f5f2ed]/10 hover:border-[#ff4e00]/50 hover:bg-[#ff4e00]/5'
                       }`}
                   >
                     <div className="flex items-center justify-between mb-1">

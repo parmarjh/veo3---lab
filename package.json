@@ -4,13 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npx vite --port=3000 --host=0.0.0.0",
-    "dev:all": "npx concurrently \"npm run dev\" \"npm run server\"",
-    "server": "npx tsx watch server.ts",
-    "build": "npx vite build",
+    "dev": "node ./node_modules/vite/bin/vite.js --port=3000 --host=0.0.0.0",
+    "dev:all": "node ./node_modules/concurrently/dist/bin/concurrently.js \"npm run dev\" \"npm run server\"",
+    "server": "node --import tsx --watch server.ts",
+    "build": "node ./node_modules/vite/bin/vite.js build",
     "start": "node dist/server.js",
     "clean": "rm -rf dist",
-    "lint": "npx tsc --noEmit"
+    "lint": "node ./node_modules/typescript/bin/tsc --noEmit"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

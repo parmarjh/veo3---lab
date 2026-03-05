@@ -1,17 +1,19 @@
 {
     "name": "ts-base",
     "version": "1.0.0",
+    "type": "module",
     "description": "A minimal JavaScript/TypeScript starter with premium UI and API example",
     "scripts": {
         "build": "npx tsc",
         "start": "npm run build && npx serve -s .",
-        "dev": "npx ts-node src/index.ts"
+        "dev": "node --import tsx src/index.ts"
     },
     "devDependencies": {
         "typescript": "^5.5.0",
         "serve": "^14.2.0",
         "dotenv": "^16.4.5",
         "node-fetch": "^3.3.2",
-        "ts-node": "^10.9.2"
+        "ts-node": "^10.9.2",
+        "tsx": "^4.21.0"
     }
 }
