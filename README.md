@@ -6,7 +6,7 @@
 
 Advanced AI-powered video generation platform using Google's Gemini API and Veo-3 model. Generate cinematic videos from text prompts, images, or scene descriptions with precise control over resolution, duration, and animation dynamics.
 
-View your app in AI Studio: https://ai.studio/apps/32e49eb8-c2e4-4ae3-a8c2-e2618bd1e5b6
+View your app in AI 
 
 ---
 
